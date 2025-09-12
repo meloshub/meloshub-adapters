@@ -12,6 +12,8 @@
 
 ## 适配器开发
 
+fork本仓库，在项目根目录下新建一个新适配器的package。
+
 ### 1. 定义适配器
 
 定义一个新的适配器结构体，并继承adapter.Base：
@@ -37,6 +39,10 @@ func (a *ExampleAdapter) GetSongByID(id string) (*model.Song, error) {
 	}, nil
 }
 
+func (a *ExampleAdapter) GetLyricsByID(id string) (string, error) {
+	return "", nil
+}
+
 func (a *ExampleAdapter) GetAlbumSongsByID(id string) ([]model.Song, error) {
 	return []model.Song{}, nil
 }
@@ -60,10 +66,8 @@ func New() *ExampleAdapter {
 }
 ```
 
-### 4. 导入适配器
+### 4. 提交并触发CI
 
-在主程序入口中导入适配器：
+当你发起pull requests时，仓库的actions会执行一系列流程，主要包括：1.代码审查 2.适配器元数据生成 3.适配器变动监听 4. 项目入口(all.go)生成
 
-```go
-import _ "github.com/meloshub/meloshub-adapters/example"
-```
+如果没有其他的问题，当pr通过后，你的适配器就可以在主框架被正常导入和使用了。

@@ -1,0 +1,6 @@
+- id: example
+  title: Example Adapter
+  type: community
+  version: 1.0.0
+  author: meloshub
+  description: An example adapter for meloshub development

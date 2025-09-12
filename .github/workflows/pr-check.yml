@@ -1,0 +1,116 @@
+name: Adapter PR Check & Notification
+
+on:
+  pull_request:
+    branches:
+      - main
+      
+      
+jobs:
+  validate-and-notify:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      # 检出 main 分支的代码
+      - name: Checkout main branch for comparison
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: main-branch
+
+      # 检出 PR 分支的当前代码
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          path: pr-branch
+
+      # 设置 Go 环境
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      # 运行工具生成元数据和all.go文件
+      - name: Run Auto-Generation Tools
+        run: |
+          cd pr-branch
+          # 运行 metadata.yaml 生成器
+          go run ./tools/metagen/main.go --output adapters.yaml
+          # 运行 all.go 生成器
+          go run ./tools/autoimport/main.go --output ./all/all.go --pkg all
+
+      # 自动提交两个文件的变更
+      - name: Commit and push generated files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          working_directory: pr-branch 
+          commit_message: "chore(ci): auto-generate adapter files"
+          # 匹配所有需要自动提交的文件
+          file_pattern: "adapters.yaml all/all.go" 
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
+
+      # 运行 differ 工具生成变更报告
+      - name: Generate Change Report
+        id: differ
+        run: |
+          cd pr-branch
+          go run ./tools/differ/main.go \
+            --old ../main-branch/adapters.yaml \
+            --new ./adapters.yaml \
+            --output changes.json
+
+      # 使用变更报告发布PR评论
+      - name: Post Update Notification Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = './pr-branch/changes.json';
+            
+            if (!fs.existsSync(path)) {
+              console.log('Change report not found, skipping comment.');
+              return;
+            }
+
+            const changes = JSON.parse(fs.readFileSync(path, 'utf8'));
+            let body = '### 🤖 Meloshub Adapter Change Report\n\n';
+            let hasChanges = false;
+
+            if (changes.added && changes.added.length > 0) {
+              hasChanges = true;
+              body += '#### ✨ New Adapters\n';
+              for (const a of changes.added) {
+                body += `- **${a.title}** (ID: \`${a.id}\`, Version: \`${a.version}\`)\n`;
+              }
+            }
+
+            if (changes.updated && changes.updated.length > 0) {
+              hasChanges = true;
+              body += '#### ⬆️ Updated Adapters\n';
+              for (const u of changes.updated) {
+                body += `- **${u.after.title}** (ID: \`${u.after.id}\`)\n`;
+                body += `  - Version: \`${u.before.version}\` → \`${u.after.version}\`\n`;
+              }
+            }
+
+            if (changes.removed && changes.removed.length > 0) {
+              hasChanges = true;
+              body += '#### 🗑️ Removed Adapters\n';
+              for (const r of changes.removed) {
+                body += `- **${r.title}** (ID: \`${r.id}\`)\n`;
+              }
+            }
+
+            if (!hasChanges) {
+              body += '✅ No changes detected in adapter metadata.';
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });

@@ -1,0 +1,50 @@
+name: Main Branch Guard
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate-and-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.57
+
+      - name: Verify Generated Files Consistency
+        run: |
+          echo "Running generators to verify consistency..."
+          # 重新运行生成器
+          go run ./tools/allgen/main.go --output ./all/all.go --pkg all
+          go run ./tools/metagen/main.go --output adapters.yaml
+          
+          # 检查是否有任何未提交的更改
+          # `git diff --exit-code` 会在有差异时以非零状态码退出
+          if ! git diff --exit-code; then
+            echo "Error: Generated files (adapters.yaml, all/all.go) are out of sync with the source code."
+            echo "Please run the generation tools locally and commit the changes, or ensure the bot's commit was included in the PR."
+            exit 1
+          fi
+          echo "Generated files are consistent. Check passed."
+
+      # 安全检查 ---
+      - name: Run Go Vulnerability Check
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
