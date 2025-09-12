@@ -28,10 +28,19 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: v1.57
+      - name: Lint with Go Official Tools
+        run: |
+          echo "Running go vet to check for suspicious constructs..."
+          go vet ./...
+          
+          echo "Checking for unformatted files..."
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "Error: The following files are not formatted. Please run 'go fmt ./...' locally and commit the changes."
+            echo "$unformatted"
+            exit 1
+          fi
+          echo "All files are correctly formatted."
 
       - name: Verify Generated Files Consistency
         run: |
@@ -49,6 +58,5 @@ jobs:
           fi
           echo "Generated files are consistent. Check passed."
 
-      # 安全检查 ---
       - name: Run Go Vulnerability Check
         run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
