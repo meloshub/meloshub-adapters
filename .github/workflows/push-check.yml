@@ -46,7 +46,7 @@ jobs:
         run: |
           echo "Running generators to verify consistency..."
           # 重新运行生成器
-          go run ./tools/allgen/main.go --output ./all/all.go --pkg all
+          go run ./tools/autoimport/main.go --output ./all/all.go --pkg all
           go run ./tools/metagen/main.go --output adapters.yaml
           
           # 检查是否有任何未提交的更改
