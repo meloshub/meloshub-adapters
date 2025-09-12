@@ -13,12 +13,12 @@ import (
 
 type UpdateEntry struct {
 	Before adapter.Metadata `json:"before"`
-	After  adapter.Metadata         `json:"after"`
+	After  adapter.Metadata `json:"after"`
 }
 type ChangeReport struct {
-	Added   []adapter.Metadata    `json:"added"`
-	Removed []adapter.Metadata    `json:"removed"`
-	Updated []UpdateEntry `json:"updated"`
+	Added   []adapter.Metadata `json:"added"`
+	Removed []adapter.Metadata `json:"removed"`
+	Updated []UpdateEntry      `json:"updated"`
 }
 
 func main() {
