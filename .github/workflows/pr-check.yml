@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: write
 
     steps:
       # 检出 main 分支的代码
@@ -37,9 +38,18 @@ jobs:
         run: |
           cd pr-branch
           # 运行 metadata.yaml 生成器
-          go run ./tools/metagen/main.go --output adapters.yaml
+          go run github.com/meloshub/meloshub-tools/cmd/metagen@latest --output adapters.yaml
           # 运行 all.go 生成器
-          go run ./tools/autoimport/main.go --output ./all/all.go --pkg all
+          go run github.com/meloshub/meloshub-tools/cmd/autoimport@latest --output ./all/all.go --pkg all
+
+      # 运行 differ 工具生成变更报告
+      - name: Generate Change Report
+        id: differ
+        run: |
+          go run github.com/meloshub/meloshub-tools/cmd/differ@latest \
+            --old ../main-branch/adapters.yaml \
+            --new ./pr-branch/adapters.yaml \
+            --output ./pr-branch/changes.json
 
       # 自动提交两个文件的变更
       - name: Commit and push generated files
@@ -47,20 +57,9 @@ jobs:
         with:
           working_directory: pr-branch 
           commit_message: "chore(ci): auto-generate adapter files"
-          # 匹配所有需要自动提交的文件
           file_pattern: "adapters.yaml all/all.go" 
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
-
-      # 运行 differ 工具生成变更报告
-      - name: Generate Change Report
-        id: differ
-        run: |
-          cd pr-branch
-          go run ./tools/differ/main.go \
-            --old ../main-branch/adapters.yaml \
-            --new ./adapters.yaml \
-            --output changes.json
 
       # 使用变更报告发布PR评论
       - name: Post Update Notification Comment
