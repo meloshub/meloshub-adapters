@@ -41,6 +41,7 @@ jobs:
               exit 1
             fi
             echo "All files are correctly formatted."
+          fi
 
       - name: Verify Generated Files Consistency
         run: |
