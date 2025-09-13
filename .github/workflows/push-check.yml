@@ -47,17 +47,17 @@ jobs:
         run: |
           echo "Running generators to verify consistency..."
 
-          # 调用生成器工具生成临时文件
-          go run github.com/meloshub/meloshub-tools/cmd/autoimport@latest --output ./all/all.go.tmp --pkg all
-          go run github.com/meloshub/meloshub-tools/cmd/metagen@latest --output adapters.yaml.tmp
-
-          # 比较临时文件和仓库中的文件
-          echo "Comparing all/all.go with temporary file..."
-          diff ./all/all.go ./all/all.go.tmp
-          
-          echo "Comparing adapters.yaml with temporary file..."
-          diff adapters.yaml adapters.yaml.tmp
-          
+          go run github.com/meloshub/meloshub-tools/cmd/allgen@latest --output ./all/all.go --pkg all
+          go run github.com/meloshub/meloshub-tools/cmd/metagen@latest --output adapters.yaml
+          echo "Checking for differences between generated files and committed files..."
+          git_status=$(git status --porcelain)
+          if [ -n "$git_status" ]; then
+            echo "Error: Generated files are out of sync with the source code."
+            echo "The following differences were found:"
+            echo "$git_status"
+            echo "Please run the generation tools locally and commit the changes, or ensure the bot's commit was included in the PR."
+            exit 1
+          fi
           echo "Generated files are consistent. Check passed."
 
       - name: Run Go Vulnerability Check
