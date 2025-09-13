@@ -27,17 +27,20 @@ jobs:
 
       - name: Lint with Go Official Tools
         run: |
-          echo "Running go vet to check for suspicious constructs..."
-          go vet ./...
-          
-          echo "Checking for unformatted files..."
-          unformatted=$(gofmt -l .)
-          if [ -n "$unformatted" ]; then
-            echo "Error: The following files are not formatted. Please run 'go fmt ./...' locally and commit the changes."
-            echo "$unformatted"
-            exit 1
-          fi
-          echo "All files are correctly formatted."
+          if [ -z "$(go list ./...)" ]; then
+              echo "No packages to test."
+            else
+              echo "Running go vet to check for suspicious constructs..."
+              go vet ./...
+              
+              echo "Checking for unformatted files..."
+              unformatted=$(gofmt -l .)
+              if [ -n "$unformatted" ]; then
+                echo "Error: The following files are not formatted. Please run 'go fmt ./...' locally and commit the changes."
+                echo "$unformatted"
+                exit 1
+              fi
+              echo "All files are correctly formatted."
 
       - name: Verify Generated Files Consistency
         run: |
