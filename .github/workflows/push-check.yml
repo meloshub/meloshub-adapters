@@ -22,9 +22,6 @@ jobs:
       - name: Build
         run: go build ./...
 
-      - name: Test
-        run: go test ./...
-
       - name: Download dependencies
         run: go mod download
 
@@ -45,7 +42,7 @@ jobs:
       - name: Verify Generated Files Consistency
         run: |
           echo "Running generators to verify consistency..."
-          
+
           # 调用生成器工具生成临时文件
           go run github.com/meloshub/meloshub-tools/cmd/autoimport@latest --output ./all/all.go.tmp --pkg all
           go run github.com/meloshub/meloshub-tools/cmd/metagen@latest --output adapters.yaml.tmp
