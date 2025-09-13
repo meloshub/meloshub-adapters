@@ -3,5 +3,5 @@
 package all
 
 import (
-	// This list is auto-generated.
+// This list is auto-generated.
 )
