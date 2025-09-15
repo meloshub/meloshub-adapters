@@ -21,6 +21,7 @@ jobs:
         with:
           ref: ${{ github.base_ref }}
           path: main-branch
+          fetch-depth: 0
 
       # 检出 PR 分支的当前代码
       - name: Checkout PR branch
@@ -28,6 +29,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           path: pr-branch
+          fetch-depth: 0
 
       # 设置 Go 环境
       - name: Set up Go
