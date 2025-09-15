@@ -47,8 +47,8 @@ jobs:
         run: |
           echo "Running generators to verify consistency..."
 
-          go run github.com/meloshub/meloshub-tools/cmd/autoimport@v0.1.1 --output ./all/all.go --pkg all
-          go run github.com/meloshub/meloshub-tools/cmd/metagen@v0.1.1 --output adapters.yaml
+          go run github.com/meloshub/meloshub-tools/cmd/autoimport@latest --output ./all/all.go --pkg all
+          go run github.com/meloshub/meloshub-tools/cmd/metagen@latest --output adapters.yaml
           echo "Checking for differences between generated files and committed files..."
           git_status=$(git status --porcelain)
           if [ -n "$git_status" ]; then
