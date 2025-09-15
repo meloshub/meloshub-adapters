@@ -12,6 +12,7 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
+      issues: write
 
     steps:
       # 检出 main 分支的代码
@@ -61,20 +62,69 @@ jobs:
           commit_user_name: "github-actions[bot]"
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
 
-      # 使用变更报告发布PR评论
-      - name: Post Update Notification Comment
+      # 根据变更报告添加标签并发布评论
+      - name: Add Labels and Post Comment
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const path = './pr-branch/changes.json';
-            
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
             if (!fs.existsSync(path)) {
-              console.log('Change report not found, skipping comment.');
+              console.log('Change report not found, skipping labels and comment.');
               return;
             }
 
             const changes = JSON.parse(fs.readFileSync(path, 'utf8'));
+            
+            // 动态标签
+
+            const labelConfig = {
+              'NewAdapter': { color: '0e8a16', description: 'PR adds one or more new adapters.' },       // 绿色
+              'UpgradeAdapter': { color: '0075ca', description: 'PR upgrades one or more existing adapters.' }, // 蓝色
+              'RemoveAdapter': { color: 'b60205', description: 'PR removes one or more adapters.' }     // 红色
+            };
+
+            // 确保标签存在的函数
+            async function ensureLabelExists(name) {
+              const config = labelConfig[name];
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log(`Label '${name}' not found. Creating it...`);
+                  await github.rest.issues.createLabel({ owner, repo, name, ...config });
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            const labelsToAdd = [];
+            if (changes.added && changes.added.length > 0) {
+              labelsToAdd.push('NewAdapter');
+            }
+            if (changes.updated && changes.updated.length > 0) {
+              labelsToAdd.push('UpgradeAdapter');
+            }
+            if (changes.removed && changes.removed.length > 0) {
+              labelsToAdd.push('RemoveAdapter');
+            }
+
+            if (labelsToAdd.length > 0) {
+              // 确保所有需要的标签都存在
+              for (const labelName of labelsToAdd) {
+                await ensureLabelExists(labelName);
+              }
+              // 为PR添加标签
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: labelsToAdd });
+              console.log(`Added labels: ${labelsToAdd.join(', ')}`);
+            }
+            
+            // --- 评论生成与发布逻辑 ---
+
             let body = '### 🤖 Meloshub Adapter Change Report\n\n';
             let hasChanges = false;
 
@@ -88,7 +138,7 @@ jobs:
 
             if (changes.updated && changes.updated.length > 0) {
               hasChanges = true;
-              body += '#### ⬆️ Updated Adapters\n';
+              body += '#### ⬆️ Upgraded Adapters\n';
               for (const u of changes.updated) {
                 body += `- **${u.after.title}** (ID: \`${u.after.id}\`)\n`;
                 body += `  - Version: \`${u.before.version}\` → \`${u.after.version}\`\n`;
@@ -107,9 +157,4 @@ jobs:
               body += '✅ No changes detected in adapter metadata.';
             }
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: body
-            });
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
