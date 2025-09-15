@@ -26,6 +26,7 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref }}
           path: pr-branch
 
       # 设置 Go 环境
