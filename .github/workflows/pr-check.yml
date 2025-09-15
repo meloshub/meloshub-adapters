@@ -57,6 +57,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           repository: pr-branch
+          branch: ${{ github.head_ref }}
           commit_message: "chore(ci): auto-generate adapter files"
           file_pattern: "adapters.yaml all/all.go" 
           commit_user_name: "github-actions[bot]"
