@@ -37,6 +37,11 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: List files in PR branch for debugging
+        run: |
+          echo "--- Listing contents of pr-branch directory ---"
+          ls -R pr-branch
+
       # 运行工具生成元数据和all.go文件
       - name: Run Auto-Generation Tools
         run: |
