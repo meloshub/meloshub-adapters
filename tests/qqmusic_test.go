@@ -63,4 +63,17 @@ func TestQQMusic(t *testing.T) {
 	}
 	slog.Info(fmt.Sprintln("Lyrics: \n", lyrics))
 
+	// 测试获取专辑信息
+	albumDetail, err := adapterQQmusic.AlbumDetail("002jLGWe16Tf1H")
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+	jsonBytes, err = json.MarshalIndent(albumDetail, "", "  ")
+	if err != nil {
+		fmt.Println("JSON marshaling failed:", err)
+		return
+	}
+	fmt.Println(string(jsonBytes))
+
 }
