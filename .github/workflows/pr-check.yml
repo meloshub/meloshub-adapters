@@ -54,9 +54,9 @@ jobs:
         id: differ
         run: |
           go run github.com/meloshub/meloshub-tools/cmd/differ@latest \
-            --old ../main-branch/adapters.yaml \
-            --new ./pr-branch/adapters.yaml \
-            --output ./pr-branch/changes.json
+            --old main-branch/adapters.yaml \
+            --new pr-branch/adapters.yaml \
+            --output pr-branch/changes.json
 
       # 自动提交两个文件的变更
       - name: Commit and push generated files
