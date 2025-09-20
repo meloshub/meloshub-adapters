@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"strconv"
+	"time"
 
 	"log/slog"
 
@@ -16,12 +17,14 @@ import (
 )
 
 var (
-	ErrSearchSong   = errors.New("[QQMusicAdapter] Failed to search song")
-	ErrGetPlayURL   = errors.New("[QQMusicAdapter] Failed to get play url")
-	ErrEmptyPlayURL = errors.New("[QQMusicAdapter] play url is empty")
-	ErrStatusCode   = errors.New("[QQMusicAdapter] Http status error")
-	ErrUnmarshaling = errors.New("[QQMusicAdapter] Failed to unmarshaling body bytes")
-	ErrBase64Decode = errors.New("[QQMusicAdapter] Failed to decode base64")
+	ErrSearchSong      = errors.New("[QQMusicAdapter] Failed to search song")
+	ErrGetPlayURL      = errors.New("[QQMusicAdapter] Failed to get play url")
+	ErrEmptyPlayURL    = errors.New("[QQMusicAdapter] play url is empty")
+	ErrGetAlbumDetail  = errors.New("[QQMusicAdapter] Failed to album detail")
+	ErrParseTimeString = errors.New("[QQMusicAdapter] Failed to parse time string")
+	ErrStatusCode      = errors.New("[QQMusicAdapter] Http status error")
+	ErrUnmarshaling    = errors.New("[QQMusicAdapter] Failed to unmarshaling body bytes")
+	ErrBase64Decode    = errors.New("[QQMusicAdapter] Failed to decode base64")
 )
 
 // 搜索结果响应体结构体
@@ -88,7 +91,7 @@ func New() *QQMusicAdapter {
 		Id:          "qqmusic",
 		Title:       "QQ音乐适配器",
 		Type:        adapter.TypeOfficial,
-		Version:     "0.1.0",
+		Version:     "0.1.1",
 		Author:      "Kaguya233qwq",
 		Description: "qq音乐适配器",
 	}
@@ -268,7 +271,112 @@ func (a *QQMusicAdapter) Lyrics(id string) (string, error) {
 	return string(lyric), nil
 }
 
+type picUrlItem struct {
+	PicUrl string `json:"picurl"`
+}
+
+type singer struct {
+	Singerid   string `json:"singerid"`
+	Singermid  string `json:"singermid"`
+	Singername string `json:"singername"`
+}
+
+type albumDetailResult struct {
+	Code int `json:"code"`
+	Data struct {
+		AlbumMid    string       `json:"album_mid"`
+		AlbumName   string       `json:"album_name"`
+		Desc        string       `json:"desc"`
+		HeadpicList []picUrlItem `json:"headpiclist"`
+		PublicTime  string       `json:"publictime"`
+		SingerInfo  []singer     `json:"singerinfo"`
+		SongList    []songItem   `json:"songlist"`
+	} `json:"data"`
+}
+
 func (a *QQMusicAdapter) AlbumDetail(id string) (model.Album, error) {
-	// 先鸽了（
-	return model.Album{}, nil
+	api := "https://c6.y.qq.com/v8/fcg-bin/musicmall.fcg"
+	params := map[string]string{
+		"cv":                "4747474",
+		"ct":                "24",
+		"format":            "json",
+		"inCharset":         "utf-8",
+		"outCharset":        "utf-8",
+		"notice":            "0",
+		"platform":          "yqq.json",
+		"needNewCode":       "1",
+		"uin":               fmt.Sprint(a.qqNumber),
+		"g_tk_new_20200303": "1237177036",
+		"g_tk":              "2059730570",
+		"cmd":               "get_album_buy_page",
+		"albummid":          id,
+		"albumid":           "0",
+	}
+	timestamp := time.Now().UnixMilli()
+	params["_"] = strconv.FormatInt(timestamp, 10)
+
+	resp, err := a.Session.Get(api, params)
+	if err != nil {
+		slog.Error(fmt.Sprintf("[QQMusicAdapter] %v", err))
+	}
+
+	if resp.StatusCode != 200 {
+		return model.Album{}, ErrStatusCode
+	}
+
+	var respJson albumDetailResult
+	err = resp.JSON(&respJson)
+	if err != nil {
+		return model.Album{}, ErrUnmarshaling
+	}
+
+	if respJson.Code != 0 {
+		slog.Error(fmt.Sprintf("PlayURL error response: %+v", respJson))
+		return model.Album{}, ErrGetAlbumDetail
+	}
+
+	parsedTime, err := time.Parse("2006-01-02", respJson.Data.PublicTime)
+	if err != nil {
+		return model.Album{}, ErrParseTimeString
+	}
+	publicTimeStamp := parsedTime.Unix()
+
+	var songList []model.Song
+	for _, song := range respJson.Data.SongList {
+
+		var singerList []model.Singer
+		for _, singer := range song.Singer {
+			singerList = append(singerList, model.Singer{
+				ID:   singer.Mid,
+				Name: singer.Name,
+			})
+		}
+		songList = append(songList, model.Song{
+			ID:        song.Songmid,
+			Source:    a.Id(),
+			Title:     song.Songname,
+			Singers:   singerList,
+			AlbumId:   song.Albummid,
+			AlbumName: song.Albumname,
+			Playable:  song.Pay.Payplay == 0,
+		})
+	}
+
+	var singerList []model.Singer
+	for _, singer := range respJson.Data.SingerInfo {
+		singerList = append(singerList, model.Singer{
+			ID:   singer.Singermid,
+			Name: singer.Singername,
+		})
+	}
+
+	return model.Album{
+		ID:              respJson.Data.AlbumMid,
+		Name:            respJson.Data.AlbumName,
+		Description:     respJson.Data.Desc,
+		PublicTimestamp: publicTimeStamp,
+		CoverURL:        respJson.Data.HeadpicList[0].PicUrl,
+		SongList:        songList,
+		Singers:         singerList,
+	}, nil
 }
